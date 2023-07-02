@@ -1,0 +1,334 @@
+#!/usr/bin/env python3
+
+import csv
+import sys
+from PyQt5.QtWidgets import QApplication, QMainWindow, QTableWidget, QTableWidgetItem, QAction, QFileDialog, QPushButton, QHeaderView, QMenu, QInputDialog, QMessageBox
+from PyQt5.QtCore import Qt
+
+from openpyxl import load_workbook
+
+
+class CSVEditor(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.init_ui()
+        self.clipboard = []
+
+    def init_ui(self):
+        self.setWindowTitle("CSVEL")
+        self.setStyleSheet('''
+            QMainWindow {
+                background-color: #f1f1f1;
+            }
+
+            QTableWidget {
+                background-color: white;
+                gridline-color: #c6c6c6;
+            }
+
+            QPushButton {
+                background-color: #4caf50;
+                color: white;
+                border: none;
+                padding: 5px 10px;
+                font-size: 12px;
+            }
+
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        ''')
+
+        self.table = QTableWidget(self)
+        self.setCentralWidget(self.table)
+
+        # Context Menu
+        self.table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self.show_context_menu)
+
+        self.table.installEventFilter(self) # for keyboard shortcuts
+
+        self.file_path = None
+        self.data = []
+
+        self.create_menu()
+        self.create_toolbar()
+        self.new_csv() # initialize table with 100 rows and columns
+
+        # start maximized
+        self.showMaximized()
+
+    def create_menu(self):
+        menubar = self.menuBar()
+
+        file_menu = menubar.addMenu("File")
+
+        new_action = QAction("New", self)
+        new_action.triggered.connect(self.new_csv)
+        file_menu.addAction(new_action)
+
+        open_action = QAction("Open", self)
+        open_action.triggered.connect(self.open)
+        file_menu.addAction(open_action)
+
+        save_action = QAction("Save", self)
+        save_action.triggered.connect(self.save_csv)
+        file_menu.addAction(save_action)
+
+        save_as_action = QAction("Save As", self)
+        save_as_action.triggered.connect(self.save_as_csv)
+        file_menu.addAction(save_as_action)
+
+        view_menu = menubar.addMenu("View")
+
+        autosize_cells_action = QAction("Autosize Cells", self)
+        autosize_cells_action.triggered.connect(self.table.resizeRowsToContents)
+        autosize_cells_action.triggered.connect(self.table.resizeColumnsToContents)
+        view_menu.addAction(autosize_cells_action)
+
+    def create_toolbar(self):
+        toolbar = self.addToolBar("Toolbar")
+
+        add_row_button = QPushButton("Add Row", self)
+        add_row_button.clicked.connect(self.add_row)
+        toolbar.addWidget(add_row_button)
+
+        add_column_button = QPushButton("Add Column", self)
+        add_column_button.clicked.connect(self.add_column)
+        toolbar.addWidget(add_column_button)
+
+    def open(self):
+        file_dialog = QFileDialog(self)
+        # set name filter to csv and xlsx files
+        file_dialog.setNameFilter("CSV Files (*.csv);;Excel Files (*.xlsx)")
+        file_dialog.setDefaultSuffix("csv")
+        file_path, _ = file_dialog.getOpenFileName()
+
+        if file_path:
+
+            if file_path.endswith(".xlsx"):
+                self.open_xlsx(file_path)
+                return
+
+            self.file_path = file_path
+            self.data = []
+            with open(file_path, "r") as file:
+                reader = csv.reader(file)
+                for row in reader:
+                    self.data.append(row)
+
+            self.display_table()
+    
+    def open_xlsx(self, file_path):
+        # Show popup to confirm that opening an xlsx file will convert it to csv and may lose data
+        msg = "Opening an xlsx file will convert it to csv and may lose data. Continue?"
+        reply = QMessageBox.question(self, 'Warning', msg, QMessageBox.Yes | QMessageBox.No)
+        if reply == QMessageBox.No:
+            return
+
+        try:
+            workbook = load_workbook(filename=file_path)
+            sheets = workbook.sheetnames
+
+            if len(sheets) >= 2:
+                sheet, ok = QInputDialog.getItem(self, "Select Sheet", "Sheet:", sheets, 0, False)
+
+                if ok:
+                    sheet = workbook[sheet]
+                    self.data = []
+                    for row in sheet.iter_rows(values_only=True):
+                        self.data.append(list(row))
+                    self.display_table()
+
+            else:
+                # Get default active sheet
+                sheet = workbook.active
+                self.data = []
+                for row in sheet.iter_rows(values_only=True):
+                    self.data.append(list(row))
+                self.display_table()
+
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to open XLSX file: {str(e)}")
+
+    def save_csv(self):
+        if self.file_path:
+            with open(self.file_path, "w", newline="") as file:
+                writer = csv.writer(file)
+                writer.writerows(self.get_table_data())
+        else:
+            self.save_as_csv()
+            
+    def save_as_csv(self):
+        file_dialog = QFileDialog(self)
+        file_dialog.setNameFilter("CSV Files (*.csv)")
+        file_dialog.setDefaultSuffix("csv")
+        file_path, _ = file_dialog.getSaveFileName()
+
+        if file_path:
+            self.file_path = file_path
+            with open(file_path, "w", newline="") as file:
+                writer = csv.writer(file)
+                writer.writerows(self.get_table_data())
+
+    def new_csv(self):
+        self.table.clear()
+        self.file_path = None
+        self.data = []
+        self.table.setRowCount(100)
+        self.table.setColumnCount(100)
+
+    def eventFilter(self, obj, event):
+        if obj == self.table and event.type() == event.KeyPress:
+            if event.key() == Qt.Key_Delete:
+                # if every cell in a column is selected, delete the column
+                selected_columns = set()
+                for cell in self.table.selectedItems():
+                    selected_columns.add(cell.column())
+                if len(selected_columns) == self.table.columnCount():
+                    self.delete_columns(selected_columns)
+                # if every cell in a row is selected, delete the row
+                selected_rows = set()
+                for cell in self.table.selectedItems():
+                    selected_rows.add(cell.row())
+                if len(selected_rows) == self.table.rowCount():
+                    self.table.removeRow(list(selected_rows)[0])
+                return True
+            
+            elif event.key() == Qt.Key_Return:
+                # stop typing and select current cell
+                self.table.setCurrentCell(self.table.currentRow(), self.table.currentColumn())
+                return True
+            
+            elif event.key() == Qt.Key_Tab:
+                # stop typing and select next cell
+                self.table.setCurrentCell(self.table.currentRow(), self.table.currentColumn())
+                return True
+            
+            elif event.key() == Qt.Key_Backspace:
+                # remove text from selected cells
+                for cell in self.table.selectedItems():
+                    cell.setText('')
+                return True
+            
+            elif event.key() == Qt.Key_A and event.modifiers() == Qt.ControlModifier:
+                # select all cells
+                self.table.selectAll()
+                return True
+            
+            elif event.key() == Qt.Key_S and event.modifiers() == Qt.ControlModifier:
+                # save
+                self.save_csv()
+                return True
+            
+            elif event.key() == Qt.Key_O and event.modifiers() == Qt.ControlModifier:
+                # open
+                self.open()
+                return True
+            
+            elif event.key() == Qt.Key_N and event.modifiers() == Qt.ControlModifier:
+                # new
+                self.new_csv()
+                return True
+            
+        return super().eventFilter(obj, event)
+    
+    def show_context_menu(self, position):
+        menu = QMenu(self.table)
+        
+        delete_column_action = QAction("Delete Column", self)
+        delete_column_action.triggered.connect(self.delete_selected_columns)
+        menu.addAction(delete_column_action)
+
+        delete_row_action = QAction("Delete Row", self)
+        delete_row_action.triggered.connect(self.delete_selected_rows)
+        menu.addAction(delete_row_action)
+
+        add_row_at_index = QAction("Add Row At Selection", self)
+        add_row_at_index.triggered.connect(self.add_row_at_index)
+        menu.addAction(add_row_at_index)
+
+        add_column_at_index = QAction("Add Column At Selection", self)
+        add_column_at_index.triggered.connect(self.add_column_at_index)
+        menu.addAction(add_column_at_index)
+
+        menu.exec_(self.table.viewport().mapToGlobal(position))
+
+    def delete_selected_columns(self):
+        selected_columns = set(index.column() for index in self.table.selectedIndexes())
+        if selected_columns:
+            self.delete_columns(selected_columns)
+
+    def delete_columns(self, columns):
+        sorted_columns = sorted(columns, reverse=True)
+        for column in sorted_columns:
+            self.table.removeColumn(column)
+            
+    def delete_selected_rows(self):
+        selected_rows = set(index.row() for index in self.table.selectedIndexes())
+        if selected_rows:
+            self.delete_rows(selected_rows)
+
+    def delete_rows(self, rows):
+        sorted_rows = sorted(rows, reverse=True)
+        for row in sorted_rows:
+            self.table.removeRow(row)
+
+    def adjust_columns(self):
+        for column in range(self.table.columnCount()):
+            self.table.horizontalHeader().setSectionResizeMode(column, QHeaderView.Stretch)
+
+    def display_table(self):
+        num_rows = len(self.data)
+        num_cols = len(self.data[0])
+
+        self.table.setRowCount(num_rows)
+        self.table.setColumnCount(num_cols)
+
+        for i, row in enumerate(self.data):
+            for j, value in enumerate(row):
+                item = QTableWidgetItem(value)
+                self.table.setItem(i, j, item)
+
+    def get_table_data(self):
+        table_data = []
+        for i in range(self.table.rowCount()):
+            row = []
+            for j in range(self.table.columnCount()):
+                item = self.table.item(i, j)
+                row.append(item.text())
+            table_data.append(row)
+        return table_data
+
+    def add_row(self):
+        num_rows = self.table.rowCount()
+        self.table.insertRow(num_rows)
+        for j in range(self.table.columnCount()):
+            item = QTableWidgetItem('')
+            self.table.setItem(num_rows, j, item)
+    
+    def add_row_at_index(self, index):
+        self.table.insertRow(index)
+        for j in range(self.table.columnCount()):
+            item = QTableWidgetItem('')
+            self.table.setItem(index, j, item)
+
+    def add_column(self):
+        num_cols = self.table.columnCount()
+        self.table.insertColumn(num_cols)
+        for i in range(self.table.rowCount()):
+            item = QTableWidgetItem('')
+            self.table.setItem(i, num_cols, item)
+    
+    def add_column_at_index(self, index):
+        self.table.insertColumn(index)
+        for i in range(self.table.rowCount()):
+            item = QTableWidgetItem('')
+            self.table.setItem(i, index, item)
+
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    csv_editor = CSVEditor()
+    csv_editor.show()
+    sys.exit(app.exec_())

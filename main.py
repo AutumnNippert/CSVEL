@@ -9,7 +9,7 @@ class CSVEditor(QMainWindow):
         self.init_ui()
 
     def init_ui(self):
-        self.setWindowTitle("CSVE")
+        self.setWindowTitle("CSVEL")
         self.setStyleSheet('''
             QMainWindow {
                 background-color: #f1f1f1;

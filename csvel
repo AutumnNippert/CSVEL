@@ -20,28 +20,8 @@ class CSVEditor(QMainWindow):
 
         self.setWindowIcon(QIcon("icon.svg"))
 
-        self.setStyleSheet('''
-            QMainWindow {
-                background-color: #f1f1f1;
-            }
-
-            QTableWidget {
-                background-color: white;
-                gridline-color: #c6c6c6;
-            }
-
-            QPushButton {
-                background-color: #4caf50;
-                color: white;
-                border: none;
-                padding: 5px 10px;
-                font-size: 12px;
-            }
-
-            QPushButton:hover {
-                background-color: #45a049;
-            }
-        ''')
+        css = open("style.css", "r").read()
+        self.setStyleSheet(css)
 
         self.table = QTableWidget(self)
         self.setCentralWidget(self.table)

@@ -1,0 +1,31 @@
+
+QMainWindow {
+    background-color: #ffffff;
+}
+
+QTableWidget {
+    background-color: #ffffff;
+    gridline-color: #e0e0e0;
+    border: none;
+}
+
+QTableWidget::item:hover{
+    background-color: #bde4ff;
+}
+
+QTableWidget::item:selected {
+    background-color: #91cbe7;
+}
+
+QPushButton {
+    background-color: #4caf50;
+    color: #ffffff;
+    border: none;
+    padding: 8px 16px;
+    font-size: 14px;
+    border-radius: 4px;
+}
+
+QPushButton:hover {
+    background-color: #45a049;
+}

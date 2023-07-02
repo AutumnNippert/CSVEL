@@ -4,6 +4,7 @@ import csv
 import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow, QTableWidget, QTableWidgetItem, QAction, QFileDialog, QPushButton, QHeaderView, QMenu, QInputDialog, QMessageBox
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QIcon
 
 from openpyxl import load_workbook
 
@@ -16,6 +17,9 @@ class CSVEditor(QMainWindow):
 
     def init_ui(self):
         self.setWindowTitle("CSVEL")
+
+        self.setWindowIcon(QIcon("icon.svg"))
+
         self.setStyleSheet('''
             QMainWindow {
                 background-color: #f1f1f1;
@@ -63,21 +67,58 @@ class CSVEditor(QMainWindow):
 
         file_menu = menubar.addMenu("File")
 
-        new_action = QAction("New", self)
+        new_action = QAction("New (Ctrl+N)", self)
         new_action.triggered.connect(self.new_csv)
         file_menu.addAction(new_action)
 
-        open_action = QAction("Open", self)
+        open_action = QAction("Open (Ctrl+O)", self)
         open_action.triggered.connect(self.open)
         file_menu.addAction(open_action)
 
-        save_action = QAction("Save", self)
+        save_action = QAction("Save (Ctrl+S)", self)
         save_action.triggered.connect(self.save_csv)
         file_menu.addAction(save_action)
 
-        save_as_action = QAction("Save As", self)
+        save_as_action = QAction("Save As (Ctrl+Shift+S)", self)
         save_as_action.triggered.connect(self.save_as_csv)
         file_menu.addAction(save_as_action)
+
+        edit_menu = menubar.addMenu("Edit")
+
+        undo_action = QAction("Undo (Ctrl+Z)", self)
+        # undo_action.triggered.connect(self.table.undo)
+        edit_menu.addAction(undo_action)
+
+        redo_action = QAction("Redo (Ctrl+Shift+Z)", self)
+        # redo_action.triggered.connect(self.table.redo)
+        edit_menu.addAction(redo_action)
+
+        # add separator line
+        edit_menu.addSeparator()
+
+        delete_column_action = QAction("Delete Columns (Del)", self)
+        delete_column_action.triggered.connect(self.delete_selected_columns)
+        edit_menu.addAction(delete_column_action)
+
+        delete_row_action = QAction("Delete Rows (Del)", self)
+        delete_row_action.triggered.connect(self.delete_selected_rows)
+        edit_menu.addAction(delete_row_action)
+
+        add_row_action = QAction("Add Row", self)
+        add_row_action.triggered.connect(self.add_row)
+        edit_menu.addAction(add_row_action)
+
+        add_column_action = QAction("Add Column", self)
+        add_column_action.triggered.connect(self.add_column)
+        edit_menu.addAction(add_column_action)
+
+        add_column_at_index_action = QAction("Add Column At Selection", self)
+        add_column_at_index_action.triggered.connect(self.add_column_at_index)
+        edit_menu.addAction(add_column_at_index_action)
+
+        add_row_at_index_action = QAction("Add Row At Selection", self)
+        add_row_at_index_action.triggered.connect(self.add_row_at_index)
+        edit_menu.addAction(add_row_at_index_action)
 
         view_menu = menubar.addMenu("View")
 
@@ -105,7 +146,7 @@ class CSVEditor(QMainWindow):
         file_path, _ = file_dialog.getOpenFileName()
 
         if file_path:
-
+            self.setWindowTitle("CSVEL - " + file_path)
             if file_path.endswith(".xlsx"):
                 self.open_xlsx(file_path)
                 return
@@ -221,6 +262,11 @@ class CSVEditor(QMainWindow):
                 self.save_csv()
                 return True
             
+            elif event.key() == Qt.Key_S and event.modifiers() == (Qt.ControlModifier | Qt.ShiftModifier):
+                # save as
+                self.save_as_csv()
+                return True
+            
             elif event.key() == Qt.Key_O and event.modifiers() == Qt.ControlModifier:
                 # open
                 self.open()
@@ -236,11 +282,11 @@ class CSVEditor(QMainWindow):
     def show_context_menu(self, position):
         menu = QMenu(self.table)
         
-        delete_column_action = QAction("Delete Column", self)
+        delete_column_action = QAction("Delete Columns", self)
         delete_column_action.triggered.connect(self.delete_selected_columns)
         menu.addAction(delete_column_action)
 
-        delete_row_action = QAction("Delete Row", self)
+        delete_row_action = QAction("Delete Rows", self)
         delete_row_action.triggered.connect(self.delete_selected_rows)
         menu.addAction(delete_row_action)
 

@@ -12,8 +12,16 @@ from openpyxl import load_workbook
 class CSVEditor(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.init_ui()
+
         self.clipboard = []
+        self.undo_cache = [] # For undo
+        self.redo_cache = [] # For redo
+        self.HISTORY_CONST = 5
+
+        self.is_row_ripple_edit = False # This is for pasting that moves things around them away, like inserting a column and row
+        self.is_column_ripple_edit = False
+
+        self.init_ui()
 
     def init_ui(self):
         self.setWindowTitle("CSVEL")
@@ -66,11 +74,11 @@ class CSVEditor(QMainWindow):
         edit_menu = menubar.addMenu("Edit")
 
         undo_action = QAction("Undo (Ctrl+Z)", self)
-        # undo_action.triggered.connect(self.table.undo)
+        undo_action.triggered.connect(self.undo)
         edit_menu.addAction(undo_action)
 
         redo_action = QAction("Redo (Ctrl+Shift+Z)", self)
-        # redo_action.triggered.connect(self.table.redo)
+        redo_action.triggered.connect(self.redo)
         edit_menu.addAction(redo_action)
 
         # add separator line
@@ -268,6 +276,28 @@ class CSVEditor(QMainWindow):
                 self.fit_to_data()
                 return True
             
+            elif event.key() == Qt.Key_Z and event.modifiers() == Qt.ControlModifier:
+                self.undo()
+                return True
+            
+            elif event.key() == Qt.Key_Z and event.modifiers() == (Qt.ControlModifier | Qt.ShiftModifier):
+                self.redo()
+                return True
+            
+            # update cache
+            if len(self.undo_cache) > self.HISTORY_CONST:
+                #left shift and remove the [0]
+                pass
+            
+            print(self.undo_cache)
+
+            self.undo_cache.append(self.table)
+            self.redo_cache.clear()
+
+
+            
+
+            
         return super().eventFilter(obj, event)
     
     def show_context_menu(self, position):
@@ -382,6 +412,22 @@ class CSVEditor(QMainWindow):
         for i in range(self.table.rowCount()):
             item = QTableWidgetItem('')
             self.table.setItem(i, index, item)
+
+    def undo(self):
+        try:
+            last_state = self.undo_cache.pop()
+            self.redo_cache.append(last_state)
+            self.table = last_state
+        except:
+            pass
+        
+    def redo(self):
+        try:
+            re_state = self.redo_cache.pop()
+            self.undo_cache.append(re_state)
+            self.table = re_state
+        except:
+            pass
 
 
 if __name__ == "__main__":

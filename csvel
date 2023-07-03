@@ -100,6 +100,13 @@ class CSVEditor(QMainWindow):
         add_row_at_index_action.triggered.connect(self.add_row_at_index)
         edit_menu.addAction(add_row_at_index_action)
 
+        # add separator line
+        edit_menu.addSeparator()
+
+        resize_to_data_action = QAction("Resize to Data (Ctrl+Shift+F)", self)
+        resize_to_data_action.triggered.connect(self.fit_to_data)
+        edit_menu.addAction(resize_to_data_action)
+
         view_menu = menubar.addMenu("View")
 
         autosize_cells_action = QAction("Autosize Cells", self)
@@ -257,6 +264,10 @@ class CSVEditor(QMainWindow):
                 self.new_csv()
                 return True
             
+            elif event.key() == Qt.Key_F and event.modifiers() == (Qt.ControlModifier | Qt.ShiftModifier):
+                self.fit_to_data()
+                return True
+            
         return super().eventFilter(obj, event)
     
     def show_context_menu(self, position):
@@ -303,6 +314,26 @@ class CSVEditor(QMainWindow):
     def adjust_columns(self):
         for column in range(self.table.columnCount()):
             self.table.horizontalHeader().setSectionResizeMode(column, QHeaderView.Stretch)
+
+    def fit_to_data(self):
+        # resize rows and columns to fit data
+        # find furthest right column with data
+        max_column = 0
+        for row in range(self.table.rowCount()):
+            for column in range(self.table.columnCount()):
+                if self.table.item(row, column) and self.table.item(row, column).text():
+                    max_column = max(max_column, column)
+        # find furthest down row with data
+        max_row = 0
+        for column in range(self.table.columnCount()):
+            for row in range(self.table.rowCount()):
+                if self.table.item(row, column) and self.table.item(row, column).text():
+                    max_row = max(max_row, row)
+
+        self.table.setRowCount(max_row + 1)
+        self.table.setColumnCount(max_column + 1)
+
+        self.adjust_columns()
 
     def display_table(self):
         num_rows = len(self.data)

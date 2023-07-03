@@ -10,7 +10,7 @@ QTableWidget {
 }
 
 QTableWidget::item:hover{
-    background-color: #bde4ff;
+    background-color: #eaeaea;
 }
 
 QTableWidget::item:selected {
